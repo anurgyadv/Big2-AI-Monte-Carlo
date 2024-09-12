@@ -142,19 +142,13 @@ class Algorithm:
             print(f"To beat: {state.toBeat.cards if state.toBeat else 'None'}")
 
             # Analyze game history
-            # print("Analyzing game history...")
             self.analyze_game_history(state.matchHistory)
-            # print("Game history analysis complete.")
 
             # Perform MCTS and choose the best action
-            # print("Starting MCTS...")
             action = self.perform_mcts(state, move_history, info_sets, opponent_model)
-            # print("MCTS complete.")
 
             # Update strategies
-            # print("Updating strategies...")
             move_history, info_sets, opponent_model = self.update_strategies(action, state, move_history, info_sets, opponent_model)
-            # print("Strategy update complete.")
 
             # Prepare data for the next turn
             myData = json.dumps({
@@ -167,6 +161,13 @@ class Algorithm:
             if not action:
                 print("No valid moves found, passing turn.")
                 return [], myData
+
+            # Play the longest valid combination if it's the first move of the round
+            if state.toBeat is None or not state.toBeat.cards:
+                possible_moves = self.get_possible_moves(state)
+                longest_move = max(possible_moves, key=len)
+                if len(longest_move) > len(action):
+                    action = longest_move
 
             print(f"Chosen action: {action}")
             print(f"Player {state.myPlayerNum} - Turn end")
@@ -354,37 +355,32 @@ class Algorithm:
         return node
 
     def simulate(self, node: MCTSNode):
-        # print("    Simulate: Starting")
         state = self.deep_copy_state(node.state)
         depth = 0
         while not self.is_terminal(state):
             possible_moves = self.get_possible_moves(state)
             if not possible_moves:
-                # print(f"    Simulate: No moves available at depth {depth}, passing turn")
                 state = self.pass_turn(state)
             else:
-                # print(f"    Simulate: Choosing move at depth {depth}")
-                move = self.choose_simulation_move(possible_moves)
+                move = self.choose_simulation_move(possible_moves, state)
                 state = self.apply_move(state, move)
             depth += 1
             if depth > 100:  # Safeguard against infinite loops
-                # print("    Simulate: Maximum depth reached, terminating simulation")
                 break
         result = self.get_result(state)
-        # print(f"    Simulate: Finished with result {result}")
         return result
-    
-    def choose_simulation_move(self, possible_moves):
-    # Prioritize longer combinations
-        longest_moves = [move for move in possible_moves if len(move) == max(len(m) for m in possible_moves)]
-        return random.choice(longest_moves)
+        
+    def choose_simulation_move(self, possible_moves, state):
+        # Prioritize longer combinations and higher value cards
+        return max(possible_moves, key=lambda move: (len(move), max(self.get_card_value(card) for card in move)))
 
     def backpropagate(self, node: MCTSNode, result: float):
-        # print("    Backpropagate: Starting")
         while node:
-            node.update(result)
+            node.visits += 1
+            # Adjust the value update based on the number of cards left
+            cards_left_factor = len(node.state.myHand) / 13  # Normalize by starting hand size
+            node.value += result * (1 - cards_left_factor)  # Reward states with fewer cards more
             node = node.parent
-        # print("    Backpropagate: Finished")
 
     def ucb_select(self, node: MCTSNode):
         log_n_vertex = math.log(node.visits)
@@ -393,7 +389,11 @@ class Algorithm:
     def calculate_ucb(self, child: MCTSNode, log_n_vertex: float) -> float:
         if child.visits == 0:
             return float('inf')
-        return (child.value / child.visits) + math.sqrt(2 * log_n_vertex / child.visits)
+        exploitation = child.value / child.visits
+        exploration = math.sqrt(2 * log_n_vertex / child.visits)
+        # Add a term to favor nodes with fewer cards left
+        cards_left_penalty = len(child.state.myHand) / 13  # Normalize by starting hand size
+        return exploitation + exploration - cards_left_penalty
 
     def get_possible_moves(self, state: MatchState) -> List[List[str]]:
         hand = self.convert_hand(state.myHand)
@@ -412,6 +412,9 @@ class Algorithm:
         else:
             to_beat = self.convert_hand(state.toBeat.cards)
             possible_moves = [move for move in all_moves if self.is_valid_play(move, to_beat)]
+
+        # Prioritize moves that play more cards
+        possible_moves.sort(key=len, reverse=True)
 
         return [self.convert_back_hand(move) for move in possible_moves]
 
