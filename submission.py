@@ -284,31 +284,93 @@ class Algorithm:
     def is_stronger(self, combo: List[int], to_beat: List[int]) -> bool:
         combo_type = self.get_hand_type(combo)
         to_beat_type = self.get_hand_type(to_beat)
-
-        if combo_type == "Flush" and to_beat_type == "Straight":
-            return True  # Flush always beats a straight
-
-        if combo_type in ["Single", "Pair", "Triple"]:
-            return max(combo) > max(to_beat)
         
-        elif combo_type in ["Straight", "Flush", "StraightFlush"]:
+        if combo_type != to_beat_type:
+            # Hands must be of the same type to compare
+            return False
+
+        if combo_type == "Flush":
+            # Compare flushes
+            return self.compare_flushes(combo, to_beat)
+        elif combo_type == "Straight":
+            # Compare highest cards (includes suit)
             return max(combo) > max(to_beat)
-        
+        elif combo_type == "StraightFlush":
+            # Compare highest cards (includes suit)
+            return max(combo) > max(to_beat)
         elif combo_type == "FullHouse":
-            return self.get_triple_value(combo) > self.get_triple_value(to_beat)
-        
+            # Compare triplet values
+            combo_triple = self.get_triple_value(combo)
+            to_beat_triple = self.get_triple_value(to_beat)
+            if combo_triple != to_beat_triple:
+                return combo_triple > to_beat_triple
+            else:
+                # Compare pair values
+                combo_pair = self.get_pair_value(combo)
+                to_beat_pair = self.get_pair_value(to_beat)
+                return combo_pair > to_beat_pair
         elif combo_type == "FourOfAKind":
-            return self.get_quad_value(combo) > self.get_quad_value(to_beat)
-        
+            # Compare quads
+            combo_quad = self.get_quad_value(combo)
+            to_beat_quad = self.get_quad_value(to_beat)
+            if combo_quad != to_beat_quad:
+                return combo_quad > to_beat_quad
+            else:
+                # Compare kickers
+                combo_kicker = [card for card in combo if card // 4 != combo_quad // 4][0]
+                to_beat_kicker = [card for card in to_beat if card // 4 != to_beat_quad // 4][0]
+                return combo_kicker > to_beat_kicker
+        elif combo_type in ["Triple", "Pair", "Single"]:
+            # Compare highest cards (includes suit)
+            return max(combo) > max(to_beat)
+        else:
+            return False
+
+
+    def compare_flushes(self, combo: List[int], to_beat: List[int]) -> bool:
+        # Sort the hands by card values and suits descending
+        combo_sorted = sorted(combo, reverse=True)
+        to_beat_sorted = sorted(to_beat, reverse=True)
+        for c1, c2 in zip(combo_sorted, to_beat_sorted):
+            if c1 != c2:
+                return c1 > c2
+        # All cards are the same, hands are equal
         return False
+    
+    def get_pair_value(self, hand: List[int]) -> int:
+        values = [card // 4 for card in hand]
+        value_counts = {}
+        for val in values:
+            value_counts[val] = value_counts.get(val, 0) + 1
+        # Find the value with a count of 2
+        pair_value = max([val for val, count in value_counts.items() if count == 2])
+        # Return the highest card of the pair (includes suit)
+        pair_cards = [card for card in hand if card // 4 == pair_value]
+        return max(pair_cards)
+
 
     def get_triple_value(self, hand: List[int]) -> int:
         values = [card // 4 for card in hand]
-        return max(set(values), key=values.count)
+        value_counts = {}
+        for val in values:
+            value_counts[val] = value_counts.get(val, 0) + 1
+        # Find the value with a count of 3
+        triple_value = max([val for val, count in value_counts.items() if count == 3])
+        # Return the highest card of the triplet (includes suit)
+        triple_cards = [card for card in hand if card // 4 == triple_value]
+        return max(triple_cards)
+
 
     def get_quad_value(self, hand: List[int]) -> int:
         values = [card // 4 for card in hand]
-        return max(set(values), key=values.count)
+        value_counts = {}
+        for val in values:
+            value_counts[val] = value_counts.get(val, 0) + 1
+        # Find the value with a count of 4
+        quad_value = max([val for val, count in value_counts.items() if count == 4])
+        # Return the highest card of the quad (includes suit)
+        quad_cards = [card for card in hand if card // 4 == quad_value]
+        return max(quad_cards)
         
     def analyze_game_history(self, match_history):
         current_game = match_history[-1]
