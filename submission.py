@@ -143,13 +143,19 @@ class Algorithm:
 
             # Analyze game history
             # print("Analyzing game history...")
-            self.analyze_game_history(state.matchHistory)
+            # self.analyze_game_history(state.matchHistory)
             # print("Game history analysis complete.")
 
-            # Perform MCTS and choose the best action
-            # print("Starting MCTS...")
-            action = self.perform_mcts(state, move_history, info_sets, opponent_model)
-            # print("MCTS complete.")
+            # Determine if it's the first turn and we have 3D
+            if self.is_first_turn(state) and '3D' in state.myHand:
+                print("First turn of the game and we have 3D.")
+                three_d = self.convert_hand(['3D'])[0]
+                action = self.perform_mcts(state, move_history, info_sets, opponent_model, include_cards=[three_d])
+            else:
+                # Perform MCTS and choose the best action
+                # print("Starting MCTS...")
+                action = self.perform_mcts(state, move_history, info_sets, opponent_model)
+                # print("MCTS complete.")
 
             # Update strategies
             # print("Updating strategies...")
@@ -182,6 +188,12 @@ class Algorithm:
             print("  Number of players: {}".format(len(state.players)))
             print("  Current game state: {}".format(state.matchHistory[-1].finished))
             return [], json.dumps({})  # Return empty move and data in case of error
+
+    def is_first_turn(self, state: MatchState) -> bool:
+        current_game = state.matchHistory[-1]
+        if not current_game.gameHistory or not any(current_game.gameHistory):
+            return True
+        return False
 
     def convert_hand(self, hand: List[str]) -> List[int]:
         values = {'3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, '2': 15}
@@ -308,7 +320,7 @@ class Algorithm:
             for trick in round:
                 print(f"  Player {trick.playerNum} played: {trick.cards}")
 
-    def perform_mcts(self, state: MatchState, move_history, info_sets, opponent_model):
+    def perform_mcts(self, state: MatchState, move_history, info_sets, opponent_model, include_cards: List[int]=None):
         # print("Initializing MCTS...")
         root = MCTSNode(state)
         end_time = time.time() + 0.8  # Reduced slightly to ensure we don't exceed time limit
@@ -324,11 +336,12 @@ class Algorithm:
                 print(f"Error in MCTS iteration: {str(e)}")
                 break
         # print(f"MCTS completed {iterations} iterations.")
-        possible_moves = self.get_possible_moves(root.state)
+        possible_moves = self.get_possible_moves(root.state, include_cards)
         if not possible_moves:
             return []  # Pass if no valid moves found
         best_move = self.choose_strategic_move(possible_moves, state, move_history, info_sets, opponent_model)
         return best_move
+
 
     def select(self, node: MCTSNode):
         # print("    Select: Starting")
@@ -395,7 +408,7 @@ class Algorithm:
             return float('inf')
         return (child.value / child.visits) + math.sqrt(2 * log_n_vertex / child.visits)
 
-    def get_possible_moves(self, state: MatchState) -> List[List[str]]:
+    def get_possible_moves(self, state: MatchState, include_cards: List[int]=None) -> List[List[str]]:
         hand = self.convert_hand(state.myHand)
         possible_moves = []
         
@@ -412,6 +425,10 @@ class Algorithm:
         else:
             to_beat = self.convert_hand(state.toBeat.cards)
             possible_moves = [move for move in all_moves if self.is_valid_play(move, to_beat)]
+
+        if include_cards:
+            include_cards_set = set(include_cards)
+            possible_moves = [move for move in possible_moves if include_cards_set.issubset(set(move))]
 
         return [self.convert_back_hand(move) for move in possible_moves]
 
