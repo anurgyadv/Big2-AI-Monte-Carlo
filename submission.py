@@ -24,104 +24,6 @@ class MCTSNode:
         self.visits += 1
         self.value += result
 
-def convert_hand(hand: List[str]) -> List[int]:
-    values = {'3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, '2': 15}
-    suits = {'D': 0, 'C': 1, 'H': 2, 'S': 3}
-    return [(values[card[0]] - 3) * 4 + suits[card[1]] for card in hand]
-
-def convert_back_hand(hand: List[int]) -> List[str]:
-    values = '34567890JQKA2'
-    suits = 'DCHS'
-    return [f"{values[card // 4]}{suits[card % 4]}" for card in hand]
-
-def is_valid_play(self, combo: List[int], to_beat: List[int]) -> bool:
-    if len(combo) != len(to_beat):
-        return False
-
-    combo_type = self.get_hand_type(combo)
-    to_beat_type = self.get_hand_type(to_beat)
-
-    # print(f"Comparing {self.convert_back_hand(combo)} ({combo_type}) with {self.convert_back_hand(to_beat)} ({to_beat_type})")  # Debugging print
-
-    # Edge cases:
-    # 1. A full house beats a triple
-    if combo_type == "FullHouse" and to_beat_type == "Triple":
-        return True
-    
-    # 2. A four-of-a-kind (Bomb) beats a full house
-    if combo_type == "FourOfAKind" and to_beat_type in ["FullHouse", "Triple", "Straight", "Flush"]:
-        return True
-
-    # 3. A straight flush beats any other five-card hand
-    if combo_type == "StraightFlush" and to_beat_type in ["Straight", "Flush", "FullHouse", "FourOfAKind"]:
-        return True
-
-    if combo_type != to_beat_type:
-        return False
-
-    # Standard rule: Compare based on strength within the same hand type
-    return self.is_stronger(combo, to_beat)
-
-
-def get_hand_type(hand: List[int]) -> str:
-    if len(hand) == 1:
-        return "Single"
-    elif len(hand) == 2:
-        return "Pair" if hand[0] // 4 == hand[1] // 4 else "Invalid"
-    elif len(hand) == 3:
-        return "Triple" if hand[0] // 4 == hand[1] // 4 == hand[2] // 4 else "Invalid"
-    elif len(hand) == 5:
-        value_counts = {}
-        for card in hand:
-            value = card // 4
-            value_counts[value] = value_counts.get(value, 0) + 1
-        if 3 in value_counts.values() and 2 in value_counts.values():
-            return "FullHouse"
-        elif is_straight(hand) and is_flush(hand):
-            return "StraightFlush"
-        elif is_four_of_a_kind(hand):
-            return "FourOfAKind"
-        elif is_flush(hand):
-            return "Flush"
-        elif is_straight(hand):
-            return "Straight"
-    return "Invalid"
-
-
-def is_straight(hand: List[int]) -> bool:
-    values = sorted(set(card // 4 for card in hand))
-    return len(values) == 5 and values[-1] - values[0] == 4
-
-def is_flush(hand: List[int]) -> bool:
-    return len(set(card % 4 for card in hand)) == 1
-
-def is_four_of_a_kind(hand: List[int]) -> bool:
-    values = [card // 4 for card in hand]
-    return any(values.count(value) == 4 for value in set(values))
-
-def is_full_house(hand: List[int]) -> bool:
-    values = [card // 4 for card in hand]
-    return len(set(values)) == 2 and (values.count(values[0]) in [2, 3])
-
-def is_stronger(combo: List[int], to_beat: List[int]) -> bool:
-    hand_type = get_hand_type(combo)
-    if hand_type in ["Single", "Pair", "Triple"]:
-        return max(combo) > max(to_beat)
-    elif hand_type in ["Straight", "Flush", "StraightFlush"]:
-        return max(combo) > max(to_beat)
-    elif hand_type == "FullHouse":
-        return get_triple_value(combo) > get_triple_value(to_beat)
-    elif hand_type == "FourOfAKind":
-        return get_quad_value(combo) > get_quad_value(to_beat)
-    return False
-
-def get_triple_value(hand: List[int]) -> int:
-    values = [card // 4 for card in hand]
-    return max(set(values), key=values.count)
-
-def get_quad_value(hand: List[int]) -> int:
-    values = [card // 4 for card in hand]
-    return max(set(values), key=values.count)
 
 class Algorithm:
     def getAction(self, state: MatchState):
@@ -222,8 +124,6 @@ class Algorithm:
         combo_type = self.get_hand_type(combo)
         to_beat_type = self.get_hand_type(to_beat)
 
-        # print(f"Comparing {self.convert_back_hand(combo)} ({combo_type}) with {self.convert_back_hand(to_beat)} ({to_beat_type})")  # Debugging print
-
         # Define the strength of hand types
         hand_strength = {
             "Single": 1,
@@ -237,14 +137,13 @@ class Algorithm:
         }
 
         # Special rule: a stronger hand type beats a weaker one
-        if hand_strength[combo_type] > hand_strength[to_beat_type]:
+        if hand_strength.get(combo_type, 0) > hand_strength.get(to_beat_type, 0):
             return True
-        elif hand_strength[combo_type] < hand_strength[to_beat_type]:
+        elif hand_strength.get(combo_type, 0) < hand_strength.get(to_beat_type, 0):
             return False
 
         # If they are the same type, compare the strength within the type
         return self.is_stronger(combo, to_beat)
-
 
     def get_hand_type(self, hand: List[int]) -> str:
         if len(hand) == 1:
@@ -284,19 +183,19 @@ class Algorithm:
     def is_stronger(self, combo: List[int], to_beat: List[int]) -> bool:
         combo_type = self.get_hand_type(combo)
         to_beat_type = self.get_hand_type(to_beat)
-        
+
         if combo_type != to_beat_type:
             # Hands must be of the same type to compare
             return False
 
         if combo_type == "Flush":
-            # Compare flushes
+            # Compare flushes by rank only
             return self.compare_flushes(combo, to_beat)
         elif combo_type == "Straight":
-            # Compare highest cards (includes suit)
+            # Compare highest cards
             return max(combo) > max(to_beat)
         elif combo_type == "StraightFlush":
-            # Compare highest cards (includes suit)
+            # Compare highest cards
             return max(combo) > max(to_beat)
         elif combo_type == "FullHouse":
             # Compare triplet values
@@ -304,38 +203,43 @@ class Algorithm:
             to_beat_triple = self.get_triple_value(to_beat)
             if combo_triple != to_beat_triple:
                 return combo_triple > to_beat_triple
-            else:
-                # Compare pair values
-                combo_pair = self.get_pair_value(combo)
-                to_beat_pair = self.get_pair_value(to_beat)
-                return combo_pair > to_beat_pair
+            # Compare pair values
+            combo_pair = self.get_pair_value(combo)
+            to_beat_pair = self.get_pair_value(to_beat)
+            return combo_pair > to_beat_pair
         elif combo_type == "FourOfAKind":
             # Compare quads
             combo_quad = self.get_quad_value(combo)
             to_beat_quad = self.get_quad_value(to_beat)
             if combo_quad != to_beat_quad:
                 return combo_quad > to_beat_quad
-            else:
-                # Compare kickers
-                combo_kicker = [card for card in combo if card // 4 != combo_quad // 4][0]
-                to_beat_kicker = [card for card in to_beat if card // 4 != to_beat_quad // 4][0]
-                return combo_kicker > to_beat_kicker
+            # Compare kickers
+            combo_kicker = self.get_kicker(combo, combo_quad)
+            to_beat_kicker = self.get_kicker(to_beat, to_beat_quad)
+            return combo_kicker > to_beat_kicker
         elif combo_type in ["Triple", "Pair", "Single"]:
-            # Compare highest cards (includes suit)
+            # Compare highest cards
             return max(combo) > max(to_beat)
         else:
             return False
 
-
     def compare_flushes(self, combo: List[int], to_beat: List[int]) -> bool:
-        # Sort the hands by card values and suits descending
-        combo_sorted = sorted(combo, reverse=True)
-        to_beat_sorted = sorted(to_beat, reverse=True)
-        for c1, c2 in zip(combo_sorted, to_beat_sorted):
-            if c1 != c2:
-                return c1 > c2
-        # All cards are the same, hands are equal
+        # Sort the flushes by rank in descending order
+        combo_sorted = sorted(combo, key=lambda c: (c // 4), reverse=True)
+        to_beat_sorted = sorted(to_beat, key=lambda c: (c // 4), reverse=True)
+        
+        for c_card, t_card in zip(combo_sorted, to_beat_sorted):
+            c_rank = c_card // 4
+            t_rank = t_card // 4
+            if c_rank > t_rank:
+                return True
+            elif c_rank < t_rank:
+                return False
+        # All ranks are the same, flushes are equal
         return False
+    
+    def get_kicker(self, hand: List[int], quad_value: int) -> int:
+        return max(card for card in hand if (card // 4) != (quad_value // 4))
     
     def get_pair_value(self, hand: List[int]) -> int:
         values = [card // 4 for card in hand]
