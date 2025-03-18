@@ -68,5 +68,3 @@ Building this bot taught me:
 - Probability-based AI
 - Card game combinatorics
 - Time-constrained algorithm optimization
-
-[Screenshot of the bot in action will go here]
